@@ -1,92 +1,93 @@
 // server engine
-const express = require('express')
+const express = require("express");
 const router = express.Router();
-const rootPath = process.env.ROOT_PATH
+const rootPath = process.env.ROOT_PATH;
 
 // jwt
 const { generateToken, verifyToken } = require(`${rootPath}/lib/jwt.js`);
 
 // lib
-const runQuery = require(`${rootPath}/lib/dbquery`)
+const runQuery = require(`${rootPath}/lib/dbquery`);
 
-router.post('/signup', async (req, res) => {
-  const body = req.body
-  const postSql = `INSERT INTO Member(email, password, nickname, name) VALUES('${body.email}', SHA2('${body.password}', 256), '${body.nickname}', '${body.name}')`
-  const checkEmailSql = `SELECT COUNT(email) AS checkEmail FROM Member WHERE email='${body.email}'`
-  const checkEmailData = await runQuery.fetchData(checkEmailSql)
-  let resData = {}
-  console.log("signup")
-  console.log(body)
+router.post("/signup", async (req, res) => {
+  const { email, password, nickname, name } = req.body;
+  const postSql = `INSERT INTO Member(email, password, nickname, name) VALUES('${email}', SHA2('${password}', 256), '${nickname}', '${name}')`;
+  const checkEmailSql = `SELECT COUNT(email) AS checkEmail FROM Member WHERE email='${email}'`;
+  const checkEmailData = await runQuery.fetchData(checkEmailSql);
+  let resData = {};
 
-  if(checkEmailData[0]['checkEmail']) {
+  if (checkEmailData[0]["checkEmail"]) {
     resData = {
       ...resData,
       state: false,
-      errEmailMsg: 'Overlap User_Email'
-    }
+      errEmailMsg: "Overlap User_Email",
+    };
   } else {
-    console.log(body)
-    await runQuery.fetchData(postSql)
+    await runQuery.fetchData(postSql);
     resData = {
       ...resData,
       state: true,
-      msg: 'OK'
-    }
+      msg: "OK",
+    };
   }
 
-  res.json(resData)
-})
+  res.json(resData);
+});
 
-router.post('/signin', async (req, res) => {
-  const body = req.body
-  const sql = `SELECT * FROM Member WHERE email='${body.email}' AND password=SHA2('${body.password}', 256)`
-  const checkLoginData = await runQuery.fetchData(sql)
-  console.log("signin")
-  console.log(body)
+router.post("/signin", async (req, res) => {
+  const { email, password } = req.body;
+  const sql = `SELECT * FROM Member WHERE email='${email}' AND password=SHA2('${password}', 256)`;
+  const checkLoginData = await runQuery.fetchData(sql);
 
-  if(checkLoginData.length === 0){
-    res.json({state: false, msg: 'No Match ID or Password'})
+  if (checkLoginData.length === 0) {
+    res.json({ state: false, msg: "No Match ID or Password" });
   } else {
     const payload = {
       id: checkLoginData[0].id,
       nickname: checkLoginData[0].nickname,
-      name: checkLoginData[0].name
-    }
-    
-    const { accessToken, refreshToken } = await generateToken(payload, false)
+      name: checkLoginData[0].name,
+    };
+
+    const { accessToken, refreshToken } = await generateToken(payload, false);
 
     const userData = {
       state: true,
-      msg: 'OK',
+      msg: "OK",
       ...payload,
       accessToken,
-      refreshToken
-    }
+      refreshToken,
+    };
 
-    res.json(userData)
+    res.json(userData);
   }
-})
+});
 
-router.get('/checkRefresh', async (req, res) => {
-  if(req.headers.authorization.slice(7) === 'null'){
-    res.status(401).json({msg: 'The token does not exist or has expired.'})
+router.get("/reissue", async (req, res) => {
+  if (req.headers.authorization.slice(7) === "null") {
+    res.status(401).json({ msg: "The token does not exist or has expired." });
   } else {
-    const verifyData = await verifyToken('refresh', req.headers.authorization.slice(7))
-    if(verifyData){
-      const accessToken = await generateToken({
-        id: verifyData.id,
-        nickname: verifyData.nickname,
-        name: verifyData.name,
-      }, true)
-      res.json(accessToken)
+    const verifyData = await verifyToken(
+      "refresh",
+      req.headers.authorization.slice(7)
+    );
+    if (verifyData) {
+      const accessToken = await generateToken(
+        {
+          id: verifyData.id,
+          nickname: verifyData.nickname,
+          name: verifyData.name,
+        },
+        true
+      );
+      res.json(accessToken);
     } else {
-      res.status(401).json({msg: 'The token does not exist or has expired.'})
+      res.status(401).json({ msg: "The token does not exist or has expired." });
     }
   }
-})
+});
 
-router.get('/logout', async (req, res) => {
-  res.clearCookie('access_jwt', cookieOptions).send()
-})
+router.get("/logout", async (req, res) => {
+  res.clearCookie("access_jwt", cookieOptions).send();
+});
 
 module.exports = router;
